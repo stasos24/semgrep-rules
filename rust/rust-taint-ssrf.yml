@@ -1,0 +1,58 @@
+rules:
+  - id: rust-taint-ssrf-vulnerability
+    mode: taint
+    pattern-sources:
+      - pattern: $FUNC($X)
+        where:
+          - metavariable: $FUNC
+            comparison: $FUNC in ["std::env::args", "std::env::var", "std::env::var_os", "std::io::stdin"]
+      - pattern: std::fs::File::open($PATH)
+      - pattern: std::io::BufReader::new($FILE).read_line($BUF)
+      - pattern: std::net::TcpStream::connect($ADDR)
+      - pattern: std::net::UdpSocket::recv_from($BUF)
+      - pattern: hyper::server::Server::bind(...).serve($REQ)
+        where:
+          - metavariable: $REQ
+            comparison: $REQ.uri().path() or $REQ.uri().query()
+      - pattern: tokio::io::AsyncReadExt::read($BUF)
+      - pattern: serde::Deserialize::deserialize($DESER)
+      - pattern: std::fs::read_to_string($CONFIG_FILE)
+      - pattern: rdkafka::consumer::StreamConsumer::recv($MSG)
+      - pattern: rdkafka::message::Message::payload($MSG)
+      - pattern: $SOURCE.run($CONFIG)
+        where:
+          - metavariable: $SOURCE
+            comparison: $SOURCE instanceof ["vector::sources::http::HttpSource", "vector::sources::socket::SocketSource", "vector::sources::file::FileSource"]
+    pattern-sinks:
+      - pattern: reqwest::get($URL)
+      - pattern: reqwest::Client::new().get($URL)
+      - pattern: reqwest::Client::new().post($URL)
+      - pattern: reqwest::Client::new().put($URL)
+      - pattern: reqwest::Client::post($URL)
+      - pattern: hyper::Client::new().get($URL)
+      - pattern: hyper::client::Client::new().request($REQ)
+      - pattern: hyper::Request::builder().uri($URL)
+      - pattern: ureq::get($URL)
+      - pattern: vector::sinks::http::HttpSink::run($CONFIG)
+      - pattern: vector::sinks::util::http::HttpClient::send($REQ)
+      - pattern: rusoto_core::HttpClient::new().request($REQ)
+      - pattern: aws_sdk_s3::Client::put_object().set_endpoint($URL)
+      - pattern: vector::sinks::elasticsearch::ElasticsearchSink::run($CONFIG)
+      - pattern: vector::sinks::util::http::RequestBuilder::build($URL)
+      - pattern: http::Request::builder().uri($URL)
+    pattern-sanitizers:
+      - pattern: $FUNC($URL)
+        where:
+          - metavariable: $FUNC
+            comparison: $FUNC in ["validate_url", "sanitize_url"]
+    message: |
+      Potential SSRF vulnerability detected. Tainted data from '$SOURCE' flows into an HTTP request sink '$SINK' without proper sanitization. Validate or sanitize the URL to prevent SSRF.
+    languages:
+      - rust
+    severity: ERROR
+    metadata:
+      category: security
+      subcategory: ssrf
+      cwe: "CWE-918: Server-Side Request Forgery (SSRF)"
+      owasp: "A10:2021 - Server-Side Request Forgery (SSRF)"
+      confidence: HIGH

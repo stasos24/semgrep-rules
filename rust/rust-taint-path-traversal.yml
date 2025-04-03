@@ -1,0 +1,43 @@
+rules:
+- id: rust-taint-path-traversal
+  mode: taint
+  pattern-sources:
+    # Expanded HTTP input sources
+    - pattern: $REQ.query::<$T>($PARAM)
+    - pattern: $REQ.param($PARAM)
+    - pattern: $REQ.form::<$T>($PARAM)
+    - pattern: $REQ.headers().get($HEADER)
+    - pattern: $REQ.json::<$T>()
+    - pattern: $REQ.body_string()
+    # Vector-specific sources
+    - pattern: $CONFIG.get("...")
+    - pattern: $EVENT.get($FIELD)
+    - pattern: $LOG.get($FIELD)
+    - pattern: $METRIC.tags.get($KEY)
+    - pattern: $ENV.var($NAME)
+    - pattern: $KV.get($KEY)
+
+  pattern-sinks:
+    # File system operations
+    - pattern: std::fs::File::open($PATH)
+    - pattern: std::path::Path::new($PATH)
+    - pattern: tokio::fs::File::open($PATH).await
+    - pattern: std::fs::read($PATH)
+    - pattern: std::fs::read_to_string($PATH)
+    - pattern: std::fs::write($PATH, ...)
+    # Vector-specific sinks
+    - pattern: $FILE_SINK.write($PATH, ...)
+    - pattern: $BUFFER.new_file($PATH)
+    - pattern: $ARCHIVE.extract_to($PATH)
+    - pattern: $TEMPLATE.render_file($PATH)
+
+  pattern-sanitizers:
+    - pattern: $X.strip_prefix(...)
+    - pattern: $X.canonicalize(...)
+    - pattern: $X.starts_with(...)
+    - pattern: $PATH_SANITIZER.sanitize(...)
+    - pattern: $VALIDATOR.validate_path(...)
+
+  message: "Tainted user input '$PARAM' flows into file path '$PATH' without sanitization. This could lead to path traversal vulnerabilities."
+  languages: [rust]
+  severity: ERROR

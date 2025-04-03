@@ -1,0 +1,49 @@
+rules:
+  - id: rust-taint-tracking
+    languages: [rust]
+    message: "Potential tainted input reaching a security-sensitive sink."
+    severity: WARNING
+    metadata:
+      category: security
+
+    mode: taint  # Enables taint-tracking
+
+    pattern-sources:
+      - pattern: $CONFIG.get("command")
+      - pattern: $EVENT.get("exec")
+      - pattern: $TRANSFORM.output
+      - pattern: $ENV.var("SCRIPT")
+      - pattern: $HTTP_RESPONSE.text()
+      - pattern: "env::args().collect()"
+      - pattern: "std::env::var(...)"
+      - pattern: "std::env::vars()"
+      - pattern: "std::fs::read_to_string(...)"
+      - pattern: "std::fs::read(...)"
+      - pattern: "std::io::stdin().read_line(...)"
+      - pattern: "std::io::BufRead::read_line(...)"
+      - pattern: "std::net::TcpStream::read(...)"
+      - pattern: "std::net::UdpSocket::recv(...)"
+      - pattern: "hyper::Request::body(...)"
+      - pattern: "rocket::request::Form::from_form(...)"
+      - pattern: "rocket::request::Json::from_json(...)"
+
+    pattern-sinks:
+      - pattern: "std::process::Command::new(...)"
+      - pattern: "std::process::Command::arg(...)"
+      - pattern: "std::process::Command::args(...)"
+      - pattern: "std::fs::write(...)"
+      - pattern: "std::fs::OpenOptions::write(...)"
+      - pattern: "std::net::TcpStream::write(...)"
+      - pattern: "std::net::UdpSocket::send(...)"
+      - pattern: "std::io::Write::write(...)"
+      - pattern: "std::io::Write::write_all(...)"
+      - pattern: "std::fs::File::write(...)"
+      - pattern: "rusqlite::Connection::execute(...)"
+      - pattern: "diesel::insert_into(...)"
+      - pattern: "diesel::update(...)"
+      - pattern: "diesel::delete(...)"
+      - pattern: "format!(...)"
+      - pattern: "println!(...)"
+      - pattern: "log::info!(...)"
+      - pattern: "log::warn!(...)"
+      - pattern: "log::error!(...)"

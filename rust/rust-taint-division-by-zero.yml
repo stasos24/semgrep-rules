@@ -1,0 +1,17 @@
+rules:
+  - id: rust-taint-division-by-zero
+    mode: taint
+    pattern-sources:
+      - pattern: $REQ.query::<$T>($PARAM)
+      - pattern: $REQ.param($PARAM)
+      - pattern: $REQ.form::<$T>($PARAM)
+    pattern-sinks:
+      - pattern: $X / $Y
+    pattern-sanitizers:
+      - pattern: $Y != 0
+      - pattern: $Y.checked_div($Y)
+      - pattern: match $Y { 0 => ..., _ => ... }
+      - pattern: if $Y == 0 { ... } else { ... }
+    message: "Tainted user input '$PARAM' flows into denominator '$Y' of '$X / $Y' without zero check. This could lead to division by zero."
+    languages: [rust]
+    severity: ERROR

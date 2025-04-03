@@ -1,0 +1,37 @@
+rules:
+- id: rust-taint-sql-injection
+  mode: taint
+  pattern-sources:
+    # HTTP input sources
+    - pattern: $REQ.query::<$T>($PARAM)
+    - pattern: $REQ.param($PARAM)
+    - pattern: $REQ.form::<$T>($PARAM)
+    - pattern: $REQ.json::<$T>()
+    # Vector-specific sources
+    - pattern: $CONFIG.get("sql")
+    - pattern: $EVENT.get("query")
+    - pattern: $METRIC.tags.get($KEY)
+    - pattern: $KV_STORE.get($KEY)
+    - pattern: $ENV.var("DB_QUERY")
+
+  pattern-sinks:
+    # Database operations
+    - pattern: $DB.execute($QUERY, ...)
+    - pattern: $POOL.query($QUERY, ...)
+    - pattern: $CONNECTION.exec($QUERY)
+    # Vector-specific sinks
+    - pattern: $SQL_SINK.execute($QUERY)
+    - pattern: $QUERY_BUILDER.build($RAW)
+    - pattern: $DYNAMIC_QUERY.run(...)
+    - pattern: $METRIC_DB.insert($STMT)
+
+  pattern-sanitizers:
+    - pattern: $X.match ...
+    - pattern: $X.validate(...)
+    - pattern: $X.sanitize(...)
+    - pattern: sqlx::query!($LIT, ...)
+    - pattern: $PREPARED_STMT.bind(...)
+
+  message: "Tainted user input '$PARAM' flows into SQL query '$QUERY' without sanitization. This could lead to SQL injection."
+  languages: [rust]
+  severity: ERROR

@@ -1,0 +1,21 @@
+rules:
+  - id: rust-taint-integer-overflow
+    mode: taint
+    pattern-sources:
+      - pattern: $REQ.query::<$T>($PARAM)
+      - pattern: $REQ.param($PARAM)
+      - pattern: $REQ.form::<$T>($PARAM)
+    pattern-sinks:
+      - pattern: $X + $Y
+      - pattern: $X * $Y
+    pattern-sanitizers:
+      - pattern: $X.checked_add($Y)
+      - pattern: $X.wrapping_add($Y)
+      - pattern: $X.saturating_add($Y)
+      - pattern: $X.checked_mul($Y)
+      - pattern: $X.wrapping_mul($Y)
+      - pattern: $X.saturating_mul($Y)
+      - pattern: $X.parse::<$T>().unwrap_or(...)
+    message: "Tainted user input '$PARAM' flows into arithmetic operation '$X + $Y' or '$X * $Y' without overflow protection. This could lead to integer overflow."
+    languages: [rust]
+    severity: WARNING
